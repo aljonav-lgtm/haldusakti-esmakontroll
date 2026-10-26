@@ -1,0 +1,37 @@
+// Haldusakti esmakontroll – andmebaasi skeem.
+//
+// Andmebaasi salvestatakse AINULT anonüümne kasutusstatistika.
+// Ei salvestata faili, faili nime, dokumendi teksti, tekstikatkendeid,
+// isikute ega asutuste nimesid, IP-aadressi ega brauseri tunnust.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Kontrollitava teksti sisestusviis (ainult vorming, mitte faili nimi).
+enum InputType {
+  TEXT
+  TXT
+  PDF
+  DOCX
+}
+
+/// Ühe eduka 11 punkti analüüsi anonüümne kokkuvõte.
+model AnalysisRun {
+  id           String    @id @default(cuid())
+  createdAt    DateTime  @default(now())
+  inputType    InputType
+  /// Staatuse „Leitud“ arv
+  foundCount   Int
+  /// Staatuse „Vajab kontrollimist“ arv
+  reviewCount  Int
+  /// Staatuse „Ei leitud“ arv
+  missingCount Int
+  /// Alati 11
+  totalCount   Int
+}

@@ -1,4 +1,4 @@
-import { CircleCheck, CircleX, Clock, TriangleAlert } from "lucide-react";
+import { CircleCheck, CircleX, TriangleAlert } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import type { Staatus } from "@/lib/kontroll/tyybid";
@@ -23,20 +23,11 @@ export const STAATUSE_STIIL: Record<
 };
 
 interface StatusBadgeProps {
-  /** null = kontroll on ootel (kasutajaliidese olek, mitte kontrolli staatus). */
-  staatus: Staatus | null;
+  staatus: Staatus;
 }
 
 /** Staatus on alati kirjas tekstina; värv ja ikoon on ainult lisavihjed. */
 export function StatusBadge({ staatus }: StatusBadgeProps) {
-  if (staatus === null) {
-    return (
-      <Badge variant="outline" className="h-6 px-2.5 text-muted-foreground">
-        <Clock aria-hidden="true" />
-        Ootel
-      </Badge>
-    );
-  }
   const { ikoon: Ikoon, klass } = STAATUSE_STIIL[staatus];
   return (
     <Badge variant="outline" className={cn("h-6 px-2.5", klass)}>

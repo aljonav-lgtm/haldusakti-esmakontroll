@@ -5,22 +5,25 @@ import { FileUp, Type } from "lucide-react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MAKS_FAILI_SUURUS, tuvastaFailiTyyp } from "@/lib/failid";
+import { kaivitaKontroll } from "@/lib/kontroll/kaivita";
 import type { KontrolliTulemus } from "@/lib/kontroll/tyybid";
+import type { Sisestusviis as StatistikaSisestusviis } from "@/lib/statistika/valideerimine";
 import type { Naidistekst, NaidisId } from "@/lib/naidistekstid";
 import { eraldaTekst } from "@/lib/tekstieraldus";
 import { LUHIKESE_TEKSTI_PIIR, TEATED } from "@/lib/tekstid";
 import { ActionButtons } from "./action-buttons";
 import { DocumentInput } from "./document-input";
 import { FileUploadArea, type LoetudFail } from "./file-upload-area";
-import { ResultsPanel, type KontrolliSeis } from "./results-panel";
+import { ResultsPanel } from "./results-panel";
 import { SampleTextPicker } from "./sample-text-picker";
 import { ValidationMessage, type Teade } from "./validation-message";
 
 type Sisestusviis = "tekst" | "fail";
 
 /**
- * Hoiab kogu kasutajaliidese oleku. Dokumendi tekst on ainult brauseri mälus:
- * midagi ei salvestata ega saadeta serverisse.
+ * Hoiab kogu kasutajaliidese oleku. Dokumendi tekst on ainult brauseri mälus ega
+ * lahku sealt. Pärast edukat analüüsi saadetakse serverisse ainult anonüümne
+ * arvuline kokkuvõte (sisestusviis ja staatuste arvud).
  *
  * Kumbki sisestusviis hoiab oma teksti eraldi, et vahekaardi vahetamine ei
  * segaks käsitsi sisestatud teksti ja failist eraldatud teksti.
@@ -34,14 +37,16 @@ export function CheckWorkspace() {
   const [failLaeb, setFailLaeb] = useState(false);
   const [valitudNaidis, setValitudNaidis] = useState<NaidisId | null>(null);
   const [valideerimisTeade, setValideerimisTeade] = useState<Teade | null>(null);
-  const [kontrolliSeis, setKontrolliSeis] = useState<KontrolliSeis>("tühi");
-  // Analüüsiloogika lisatakse järgmises etapis; seni tulemusi ei ole.
-  const [tulemused] = useState<KontrolliTulemus[] | null>(null);
+  // null = kontrolli pole tehtud (ooteolek).
+  const [tulemused, setTulemused] = useState<KontrolliTulemus[] | null>(null);
+  const [statistikaEbaonnestus, setStatistikaEbaonnestus] = useState(false);
 
   const failiSisendRef = useRef<HTMLInputElement>(null);
   const tulemusedRef = useRef<HTMLHeadingElement>(null);
   // Iga failivalik saab uue numbri; vananenud lugemise tulemus jäetakse kõrvale.
   const lugemiseNrRef = useRef(0);
+  // Iga kontroll saab uue numbri; vananenud statistikavastus ei muuda teadet.
+  const kontrolliNrRef = useRef(0);
 
   const aktiivneTekst = viis === "tekst" ? sisestatudTekst : failiTekst;
   const failValmis = fail !== null && failiTekst.length > 0;
@@ -51,18 +56,25 @@ export function CheckWorkspace() {
     if (failiSisendRef.current) failiSisendRef.current.value = "";
   }
 
+  /** Eemaldab analüüsi tulemused ja statistikateate; taastab ooteoleku. */
+  function lahtestaTulemused() {
+    kontrolliNrRef.current++;
+    setTulemused(null);
+    setStatistikaEbaonnestus(false);
+  }
+
   function vahetaViisi(uus: Sisestusviis) {
     if (uus === viis) return;
     setViis(uus);
     // Eelmise sisestusviisi viga ega tulemuste ooteolek ei kehti uue kohta.
     setValideerimisTeade(null);
-    setKontrolliSeis("tühi");
+    lahtestaTulemused();
   }
 
   function muudaSisestatudTeksti(uus: string) {
     setSisestatudTekst(uus);
     setValitudNaidis(null);
-    setKontrolliSeis("tühi");
+    lahtestaTulemused();
     if (valideerimisTeade?.liik === "viga" && uus.trim()) {
       setValideerimisTeade(null);
     }
@@ -72,7 +84,7 @@ export function CheckWorkspace() {
     setSisestatudTekst(naidis.tekst);
     setValitudNaidis(naidis.id);
     setValideerimisTeade(null);
-    setKontrolliSeis("tühi");
+    lahtestaTulemused();
   }
 
   async function kasitleFaili(uus: File) {
@@ -81,7 +93,7 @@ export function CheckWorkspace() {
     setFailiTekst("");
     setFailiTeated([]);
     setValideerimisTeade(null);
-    setKontrolliSeis("tühi");
+    lahtestaTulemused();
 
     const viga = (tekst: string) => {
       setFailiTeated([{ liik: "viga", tekst }]);
@@ -113,9 +125,23 @@ export function CheckWorkspace() {
 
   function kontrolli() {
     if (!kontrollLubatud) return;
-    if (!aktiivneTekst.trim()) {
+    const nr = ++kontrolliNrRef.current;
+    setStatistikaEbaonnestus(false);
+    const inputType: StatistikaSisestusviis =
+      viis === "tekst" || !fail ? "TEXT" : (fail.tyyp.toUpperCase() as StatistikaSisestusviis);
+
+    // Analüüs tehakse brauseris ja tulemused kuvatakse kohe. Anonüümne statistika
+    // saadetakse taustal; selle ebaõnnestumine ei mõjuta tulemusi.
+    // Tühja teksti korral analüüsi ei käivitata (tagastab null).
+    const uuedTulemused = kaivitaKontroll(aktiivneTekst, {
+      inputType,
+      kuiStatistikaEbaonnestus: () => {
+        if (nr === kontrolliNrRef.current) setStatistikaEbaonnestus(true);
+      },
+    });
+    if (!uuedTulemused) {
       setValideerimisTeade({ liik: "viga", tekst: TEATED.tuhiSisend });
-      setKontrolliSeis("tühi");
+      lahtestaTulemused();
       return;
     }
     setValideerimisTeade(
@@ -123,7 +149,7 @@ export function CheckWorkspace() {
         ? { liik: "hoiatus", tekst: TEATED.luhikeTekst }
         : null
     );
-    setKontrolliSeis("ootel");
+    setTulemused(uuedTulemused);
     // Kitsal ekraanil viiakse kasutaja tulemuste juurde.
     requestAnimationFrame(() => tulemusedRef.current?.focus());
   }
@@ -137,7 +163,7 @@ export function CheckWorkspace() {
     setFailLaeb(false);
     setValitudNaidis(null);
     setValideerimisTeade(null);
-    setKontrolliSeis("tühi");
+    lahtestaTulemused();
     lahtestaFailiValik();
   }
 
@@ -220,7 +246,11 @@ export function CheckWorkspace() {
         aria-labelledby="tulemused-pealkiri"
         className="min-w-0 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto lg:pr-1"
       >
-        <ResultsPanel seis={kontrolliSeis} tulemused={tulemused} headingRef={tulemusedRef} />
+        <ResultsPanel
+          tulemused={tulemused}
+          headingRef={tulemusedRef}
+          statistikaMarkus={statistikaEbaonnestus ? TEATED.statistikaEbaonnestus : null}
+        />
       </section>
     </div>
   );

@@ -29,7 +29,8 @@ export const TEATED = {
   kodeering:
     "Fail on loetud, kuid selle kodeering ei paista olevat UTF-8. Osa tähemärke võib olla valesti kuvatud.",
   failLoetud: "Fail on loetud ja kontrollimiseks valmis.",
-  analuusHiljem: "Analüüs lisatakse järgmises etapis.",
+  statistikaEbaonnestus:
+    "Kontroll lõpetati, kuid anonüümset kasutusstatistikat ei õnnestunud salvestada.",
   tulemusedTuhjad:
     "Kontrolli tulemused kuvatakse siin pärast dokumendi kontrollimist.",
 } as const;
