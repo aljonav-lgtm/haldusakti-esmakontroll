@@ -1,4 +1,5 @@
 import { CheckWorkspace } from "@/components/haldusakt/check-workspace";
+import { SiteFooter } from "@/components/haldusakt/site-footer";
 import { SiteHeader } from "@/components/haldusakt/site-header";
 
 export default function Home() {
@@ -8,6 +9,7 @@ export default function Home() {
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
         <CheckWorkspace />
       </main>
+      <SiteFooter />
     </>
   );
 }
